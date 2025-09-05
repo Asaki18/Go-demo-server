@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Orders Demo</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    input, textarea { width: 100%; padding: .5rem; margin: .5rem 0; }
+    button { padding: .5rem 1rem; margin: .5rem 0; }
+    pre { background: #f0f0f0; padding: 1rem; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <h2>Поиск заказа по <code>order_uid</code></h2>
+  <input id="orderId" placeholder="например: b563feb7b2b84b6test">
+  <button onclick="fetchOrder()">Искать</button>
+  <pre id="out"></pre>
+
+  <h3>Отправка тестового заказа</h3>
+  <button onclick="sendSample()">Отправить sample</button>
+  <textarea id="custom" rows="6" placeholder='{"order_uid":"my-id", ...}'></textarea>
+  <button onclick="sendCustom()">Отправить свой JSON</button>
+
+  <script>
+    async function fetchOrder() {
+      const id = document.getElementById('orderId').value.trim();
+      const out = document.getElementById('out');
+      out.textContent = '';
+      if (!id) return;
+      const res = await fetch('/order/' + encodeURIComponent(id));
+      out.textContent = res.ok ? JSON.stringify(await res.json(), null, 2) : await res.text();
+    }
+
+    async function sendSample() {
+      const sample = {"order_uid":"b563feb7b2b84b6test","name":"Sample order"};
+      await fetch('/ingest', {method:'POST', body:JSON.stringify(sample)});
+      document.getElementById('orderId').value = sample.order_uid;
+      alert('Sample отправлен');
+    }
+
+    async function sendCustom() {
+      const txt = document.getElementById('custom').value;
+      await fetch('/ingest', {method:'POST', body:txt});
+      alert('Custom JSON отправлен');
+    }
+  </script>
+</body>
+</html>
