@@ -41,6 +41,22 @@ func main() {
 		log.Fatalf("db: %v", err)
 	}
 
+	data, err := os.ReadFile("sample.json")
+	if err == nil {
+	    var order models.Order
+	    if err := json.Unmarshal(data, &order); err == nil {
+        	if err := store.SaveOrder(context.Background(), order); err == nil {
+            	    log.Printf("✅ Order saved: %s", order.OrderUID)
+        	} else {
+                    log.Printf("❌ failed to save order: %v", err)
+        	}
+	    } else {
+	        log.Printf("❌ failed to parse json: %v", err)
+	    }
+	} else {
+	    log.Printf("⚠️ sample.json not found (это не ошибка, можно игнорировать)")
+	}
+
 	c := cache.New(cacheLim)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
