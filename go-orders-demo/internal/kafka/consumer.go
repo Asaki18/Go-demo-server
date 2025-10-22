@@ -17,7 +17,7 @@ type Consumer struct {
 	h  Handler
 }
 
-func NewConsumer(brokers, topic, group string, store *db.Store, h Handler) *Consumer {
+func NewConsumer(brokers, topic, group string, store db.Repository, h Handler) *Consumer {
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: []string{brokers},
 		GroupID: group,
@@ -51,5 +51,6 @@ func (c *Consumer) Run(ctx context.Context) error {
 		}
 	}
 }
+
 
 func (c *Consumer) Close() error { return c.r.Close() }
