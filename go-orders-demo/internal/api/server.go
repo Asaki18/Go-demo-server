@@ -67,30 +67,57 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
+	// Читаем тело запроса
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "failed to read request body", http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
 
-	var tmp map[string]any
-	if err := json.Unmarshal(body, &tmp); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
-		return
-	}
-	id, _ := tmp["order_uid"].(string)
-	if strings.TrimSpace(id) == "" {
-		http.Error(w, "order_uid required", http.StatusBadRequest)
+	// Парсим JSON в структуру заказа
+	var order models.Order
+	if err := json.Unmarshal(body, &order); err != nil {
+		http.Error(w, "invalid JSON format", http.StatusBadRequest)
 		return
 	}
 
-	if err := s.prod.Produce(r.Context(), body); err != nil {
-		http.Error(w, fmt.Sprintf("kafka produce: %v", err), http.StatusBadGateway)
+	// Базовая валидация обязательных полей
+	if strings.TrimSpace(order.OrderUID) == "" {
+		http.Error(w, "missing field: order_uid", http.StatusBadRequest)
 		return
 	}
-	w.WriteHeader(http.StatusAccepted)
-	w.Write([]byte("queued"))
+	if strings.TrimSpace(order.TrackNumber) == "" {
+		http.Error(w, "missing field: track_number", http.StatusBadRequest)
+		return
+	}
+	if order.Payment.Transaction == "" {
+		http.Error(w, "missing field: payment.transaction", http.StatusBadRequest)
+		return
+	}
+	if order.Delivery.Name == "" || order.Delivery.Address == "" {
+		http.Error(w, "missing delivery information", http.StatusBadRequest)
+		return
+	}
+
+	// Сериализуем обратно в JSON перед отправкой в Kafka
+	data, err := json.Marshal(order)
+	if err != nil {
+		http.Error(w, "failed to encode JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// Публикуем в Kafka
+	if err := s.prod.Produce(r.Context(), data); err != nil {
+		log.Printf("failed to send to kafka: %v", err)
+		http.Error(w, "failed to send to kafka", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("accepted new order %s -> kafka", order.OrderUID)
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("order accepted"))
 }
 
 func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
